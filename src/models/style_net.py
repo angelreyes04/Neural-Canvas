@@ -19,7 +19,7 @@ class FeatureExtractor(nn.Module):
     def _create_feature_extractor(self):
         model = nn.Sequential()
 
-        layer_mapping = {
+        self.layer_mapping = {
             'conv1_1': self.vgg[0],
             'conv2_1': self.vgg[5],
             'conv3_1': self.vgg[10],
@@ -28,7 +28,7 @@ class FeatureExtractor(nn.Module):
             'conv5_1': self.vgg[28]
         }
 
-        for name, layer in layer_mapping.items():
+        for name, layer in self.layer_mapping.items():
             model.add_module(name, layer)
             model.add_module(f'{name}_relu', nn.ReLU(inplace=True))
         
@@ -49,9 +49,10 @@ class FeatureExtractor(nn.Module):
         features = self.extract_features(image)
         return {layer: features[layer] for layer in self.content_layers}
     
-    def get_style_features(self, style_images, weights):
+    def get_style_features_and_matrix(self, style_images, weights):
         combined_gram_matrices = {}
-        
+        combined_features = {}
+
         for image, weight in zip(style_images, weights):
             features = self.extract_features(image)
             
@@ -59,6 +60,12 @@ class FeatureExtractor(nn.Module):
                 feat = features[layer_name]
                 b, c, h, w = feat.size()
                 
+                if layer_name not in combined_features:
+                    combined_features[layer_name] = weight * feat
+                else:
+                    combined_features[layer_name] += weight * feat
+
+
                 feat_reshaped = feat.view(b, c, -1)
                 gram = torch.bmm(feat_reshaped, feat_reshaped.transpose(1, 2))
                 gram = gram.div(h * w * c)  # Normalize
@@ -68,4 +75,50 @@ class FeatureExtractor(nn.Module):
                 else:
                     combined_gram_matrices[layer_name] += weight * gram
                         
-        return combined_gram_matrices
+        return combined_features, combined_gram_matrices
+    
+    def get_target_matrix(self, target_image):
+        features = self.extract_features(target_image)
+        target_gram_matrices = {}
+
+        for layer_name in self.style_layers:
+            feat = features[layer_name]
+            b,c,h,w = feat.size
+            feat_reshaped = feat.view(b,c,-1)
+            gram = torch.bmm(feat_reshaped, feat_reshaped.transpose(1, 2))
+            gram = gram.div(h * w * c)  # Normalize
+            target_gram_matrices[layer_name] = gram
+
+        return target_gram_matrices
+
+    #loss
+    def calc_style_loss(self,s_gram, t_gram):
+        style_loss = 0
+        layer_weights = {}
+        for layer_name in self.style_layers:
+            if layer_name in self.layer_mapping:
+                conv_layer = self.vgg[self.layer_mapping][layer_name]
+                layer_weights[layer_name] = {'weights': conv_layer.weight.data}
+
+        for layer_name in self.style_layers:
+            style_gram = s_gram[layer_name]
+            target_gram = t_gram[layer_name]
+            layer_loss = torch.sum((style_gram - target_gram)**2)
+            style_loss += layer_weights.get(layer_name, 1.0) * layer_loss
+        
+        return style_loss
+    
+    def calc_content_loss(self,c_features, s_features):
+        c_layer_features = c_features[self.content_layers]
+        s_layer_features = s_features[self.content_layers]
+        content_loss = 0.5*torch.sum((c_layer_features - s_layer_features)**2)
+        
+        return content_loss
+    
+    def calc_loss(self, c_features, s_features, s_gram, c_gram, alpha, beta):
+        content_loss = self.calc_content_loss(c_features, s_features)
+        style_loss = self.calc_style_loss(s_gram, c_gram)
+        total_loss = alpha*content_loss + beta*style_loss
+        
+        return total_loss
+    
