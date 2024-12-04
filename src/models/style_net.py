@@ -1,6 +1,7 @@
 import torch 
 import torch.nn as nn
 from torchvision.models import vgg19, VGG19_Weights
+import config
 
 class FeatureExtractor(nn.Module):
     def __init__(self):
@@ -122,3 +123,32 @@ class FeatureExtractor(nn.Module):
         
         return total_loss
     
+def optimize_image(content_image, style_images, weights):
+    extractor = FeatureExtractor()
+    
+    # Initialize the generated image
+    generated_image = content_image.clone().requires_grad_(True)
+    optimizer = torch.optim.Adam([generated_image], lr=config.LEARNING_RATE)
+
+    # Extract target features
+    content_features = extractor.get_content_features(content_image)
+    style_gram = extractor.get_style_features(style_images, weights)
+
+    for step in range(config.NUM_STEPS):
+        optimizer.zero_grad()
+
+        # Extract features from the generated image
+        generated_content = extractor.get_content_features(generated_image)
+        generated_gram = extractor.get_style_features([generated_image], [1.0])
+
+        # Compute losses
+        total_loss = extractor.calc_loss(generated_content, content_features,
+                                     generated_gram, style_gram, extractor.content_layers[0],
+                                     extractor.style_layers, config.CONTENT_WEIGHT,
+                                     config.STYLE_WEIGHT)
+
+        # Backpropagation
+        total_loss.backward()
+        optimizer.step()
+
+    return generated_image
