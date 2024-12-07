@@ -132,7 +132,7 @@ def optimize_image(content_image, style_images, weights):
 
     # Extract target features
     content_features = extractor.get_content_features(content_image)
-    style_gram = extractor.get_style_features(style_images, weights)
+    style_gram = extractor.get_style_features_and_matrix(style_images, weights)
 
     for step in range(config.NUM_STEPS):
         optimizer.zero_grad()
