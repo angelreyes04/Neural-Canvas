@@ -139,7 +139,7 @@ def optimize_image(content_image, style_images, weights):
 
         # Extract features from the generated image
         generated_content = extractor.get_content_features(generated_image)
-        generated_gram = extractor.get_style_features([generated_image], [1.0])
+        generated_gram = extractor.get_style_features_and_matrix([generated_image], [1.0])
 
         # Compute losses
         total_loss = extractor.calc_loss(generated_content, content_features,
