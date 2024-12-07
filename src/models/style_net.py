@@ -15,25 +15,46 @@ class FeatureExtractor(nn.Module):
         self.content_layers = ['conv4_2']
         self.style_layers = ['conv1_1', 'conv2_1', 'conv3_1', 'conv4_1', 'conv5_1']
 
+        self.layer_mapping = {
+            'conv1_1': 0,    
+            'conv2_1': 5,    
+            'conv3_1': 10,   
+            'conv4_1': 19, 
+            'conv4_2': 21, 
+            'conv5_1': 28 
+        }
+
         self.model = self._create_feature_extractor()
 
     def _create_feature_extractor(self):
         model = nn.Sequential()
-
-        self.layer_mapping = {
-            'conv1_1': self.vgg[0],
-            'conv2_1': self.vgg[5],
-            'conv3_1': self.vgg[10],
-            'conv4_1': self.vgg[19],
-            'conv4_2': self.vgg[21],
-            'conv5_1': self.vgg[28]
-        }
-
-        for name, layer in self.layer_mapping.items():
-            model.add_module(name, layer)
-            model.add_module(f'{name}_relu', nn.ReLU(inplace=True))
+        i = 0
+        current_block = 1
+        current_conv = 1
+        
+        for layer in self.vgg.children():
+            if isinstance(layer, nn.Conv2d):
+                name = f'conv{current_block}_{current_conv}'
+                model.add_module(name, layer)
+                
+                if name in self.content_layers or name in self.style_layers:
+                    self.layer_mapping[name] = i
+                    
+                current_conv += 1
+                i += 1
+                
+            elif isinstance(layer, nn.ReLU):
+                model.add_module(f'relu{i}', layer)
+                i += 1
+                
+            elif isinstance(layer, nn.MaxPool2d):
+                model.add_module(f'pool{i}', layer)
+                current_block += 1
+                current_conv = 1
+                i += 1
         
         return model
+
     
     def extract_features(self, image):
         features = {}
@@ -93,61 +114,56 @@ class FeatureExtractor(nn.Module):
         return target_gram_matrices
 
     #loss
-    def calc_style_loss(self,s_gram, t_gram):
+    def calc_style_loss(self, s_gram, t_gram):
         style_loss = 0
-        layer_weights = {}
-        for layer_name in self.style_layers:
-            if layer_name in self.layer_mapping:
-                conv_layer = self.vgg[self.layer_mapping][layer_name]
-                layer_weights[layer_name] = {'weights': conv_layer.weight.data}
-
         for layer_name in self.style_layers:
             style_gram = s_gram[layer_name]
             target_gram = t_gram[layer_name]
             layer_loss = torch.sum((style_gram - target_gram)**2)
-            style_loss += layer_weights.get(layer_name, 1.0) * layer_loss
+            style_loss += layer_loss
         
         return style_loss
     
     def calc_content_loss(self,c_features, s_features):
-        c_layer_features = c_features[self.content_layers]
-        s_layer_features = s_features[self.content_layers]
-        content_loss = 0.5*torch.sum((c_layer_features - s_layer_features)**2)
+        content_loss = 0
+        for layer in self.content_layers:
+            c_layer_features = c_features[layer]
+            s_layer_features = s_features[layer]
+            content_loss += 0.5 * torch.sum((c_layer_features - s_layer_features)**2)
         
         return content_loss
     
     def calc_loss(self, c_features, s_features, s_gram, c_gram, alpha, beta):
         content_loss = self.calc_content_loss(c_features, s_features)
         style_loss = self.calc_style_loss(s_gram, c_gram)
-        total_loss = alpha*content_loss + beta*style_loss
+        total_loss = alpha * content_loss + beta * style_loss
         
         return total_loss
     
 def optimize_image(content_image, style_images, weights):
     extractor = FeatureExtractor()
     
-    # Initialize the generated image
     generated_image = content_image.clone().requires_grad_(True)
     optimizer = torch.optim.Adam([generated_image], lr=config.LEARNING_RATE)
 
-    # Extract target features
     content_features = extractor.get_content_features(content_image)
-    style_gram = extractor.get_style_features_and_matrix(style_images, weights)
+    _, style_gram = extractor.get_style_features_and_matrix(style_images, weights)
 
     for step in range(config.NUM_STEPS):
         optimizer.zero_grad()
 
-        # Extract features from the generated image
         generated_content = extractor.get_content_features(generated_image)
-        generated_gram = extractor.get_style_features_and_matrix([generated_image], [1.0])
+        _, generated_gram = extractor.get_style_features_and_matrix([generated_image], [1.0])
 
-        # Compute losses
-        total_loss = extractor.calc_loss(generated_content, content_features,
-                                     generated_gram, style_gram, extractor.content_layers[0],
-                                     extractor.style_layers, config.CONTENT_WEIGHT,
-                                     config.STYLE_WEIGHT)
+        total_loss = extractor.calc_loss(
+            generated_content, 
+            content_features,
+            generated_gram, 
+            style_gram,
+            config.CONTENT_WEIGHT,
+            config.STYLE_WEIGHT
+        )
 
-        # Backpropagation
         total_loss.backward()
         optimizer.step()
 
