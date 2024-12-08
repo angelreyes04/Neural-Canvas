@@ -1,3 +1,7 @@
+import torch 
+
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Hyperparameters
 IMG_SIZE = 512 
 CONTENT_WEIGHT = 1.0
