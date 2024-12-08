@@ -6,7 +6,7 @@ import config
 class FeatureExtractor(nn.Module):
     def __init__(self):
         super(FeatureExtractor, self).__init__()
-        self.vgg = vgg19(weights=VGG19_Weights.IMAGENET1K_V1).features.eval()
+        self.vgg = vgg19(weights=VGG19_Weights.IMAGENET1K_V1).features.eval().to(config.DEVICE)
 
         # freeze parameters since it is pretrained
         for param in self.vgg.parameters():
@@ -58,7 +58,7 @@ class FeatureExtractor(nn.Module):
     
     def extract_features(self, image):
         features = {}
-        x = image
+        x = image.to(config.DEVICE)
 
         for name, layer in self.model.named_children():
             x = layer(x)
