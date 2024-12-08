@@ -6,7 +6,7 @@ import config
 class FeatureExtractor(nn.Module):
     def __init__(self):
         super(FeatureExtractor, self).__init__()
-        self.vgg = vgg19(weights=VGG19_Weights.IMAGENET1K_V1).features.eval().to(config.DEVICE)
+        self.vgg = vgg19(weights=VGG19_Weights.IMAGENET1K_V1).features.eval().to('cuda')
 
         # freeze parameters since it is pretrained
         for param in self.vgg.parameters():
@@ -24,7 +24,7 @@ class FeatureExtractor(nn.Module):
             'conv5_1': 28 
         }
 
-        self.model = self._create_feature_extractor()
+        self.model = self._create_feature_extractor().to('cuda')
 
     def _create_feature_extractor(self):
         model = nn.Sequential()
@@ -58,7 +58,7 @@ class FeatureExtractor(nn.Module):
     
     def extract_features(self, image):
         features = {}
-        x = image.to(config.DEVICE)
+        x = image
 
         for name, layer in self.model.named_children():
             x = layer(x)
