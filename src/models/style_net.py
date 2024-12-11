@@ -147,7 +147,14 @@ def optimize_image(content_image, style_images, weights):
     optimizer = torch.optim.Adam([generated_image], lr=config.LEARNING_RATE)
 
     content_features = extractor.get_content_features(content_image)
-    _, style_gram = extractor.get_style_features_and_matrix(style_images, weights)
+    # weights for each style image
+    weights = [5, 3, 2]
+
+    all_style_gram = []
+    for i, style_image in enumerate(style_images):
+        _, style_gram = extractor.get_style_features_and_matrix(style_image, weights[i])
+        all_style_gram.append(style_gram)
+
 
     for step in range(config.NUM_STEPS):
         optimizer.zero_grad()
@@ -155,14 +162,17 @@ def optimize_image(content_image, style_images, weights):
         generated_content = extractor.get_content_features(generated_image)
         _, generated_gram = extractor.get_style_features_and_matrix([generated_image], [1.0])
 
-        total_loss = extractor.calc_loss(
-            generated_content, 
-            content_features,
-            generated_gram, 
-            style_gram,
-            config.CONTENT_WEIGHT,
-            config.STYLE_WEIGHT
-        )
+        total_loss = 0
+
+        for i, style_gram in enumerate(style_images):
+          total_loss += extractor.calc_loss(
+              generated_content,
+              content_features,
+              generated_gram,
+              style_gram,
+              config.CONTENT_WEIGHT,
+              config.STYLE_WEIGHT
+          )
 
         total_loss.backward()
         optimizer.step()
