@@ -5,8 +5,7 @@ const StyleTransferUI = () => {
   const [stylePrompt, setStylePrompt] = useState('');
   const [targetImage, setTargetImage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [targetLoading, setTargetLoading] = useState(false);
-  const colabUrl='https://b3eb-34-143-189-192.ngrok-free.app';
+  const colabUrl='https://0bad-34-143-189-192.ngrok-free.app';
 
   const handleImageUpload = (event) => {
     //console.log("image upload event triggered")
@@ -49,13 +48,11 @@ const StyleTransferUI = () => {
         throw new Error(`Error: ${response.status}`);
       }
       
-      setTargetLoading(true);
       const data = await response.json();
       console.log("Received data:", data);
       if (data.image_url) {
         setTargetImage(`${colabUrl}${data.image_url}`)
       }
-      setTargetLoading(false);
 
       //const similarImgs = await styleResponse.json();
       //setSimilarImagePaths(similarImgs.imagePaths);
@@ -111,7 +108,7 @@ const StyleTransferUI = () => {
           {loading ? 'Processing...' : 'Generate'}
         </button>
 
-        {targetImage && !targetLoading && (
+        {targetImage && (
           <div>
             <h2 className="font-bold mt-4">Target Image:</h2>
             <img 
@@ -120,9 +117,6 @@ const StyleTransferUI = () => {
               className="mt-2 max-w-full h-auto"
             />
           </div>
-        )}
-        {targetImage && targetLoading &&(
-          <div className="mt-4">Loading result image...</div>
         )}
       </div>
     </div>
