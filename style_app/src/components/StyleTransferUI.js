@@ -5,6 +5,21 @@ const StyleTransferUI = () => {
   const [stylePrompt, setStylePrompt] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [colabUrl, setColabUrl] = useState('');
+
+  useEffect(() => {
+    const fetchColabUrl = async() => {
+      try {
+        const response = await fetch('/get-colab-url');
+        const data = await response.json();
+        setColabUrl(data.colab_url);
+      }
+      catch (error) {
+        console.error("Error fetching colab public url", error);
+      }
+    };
+    fetchColabUrl();
+  }, []);
 
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
@@ -20,8 +35,7 @@ const StyleTransferUI = () => {
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      // Replace YOUR_COLAB_URL with the ngrok URL from your Colab notebook
-      const response = await fetch('YOUR_COLAB_URL/style-transfer', {
+      const response = await fetch('${colabUrl}/style-transfer', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -34,6 +48,19 @@ const StyleTransferUI = () => {
       
       const data = await response.json();
       setResult(data.result);
+
+      const styleResponse = await fetch('${colabUrl}/get-similar-styles', {
+        method: 'POST', 
+        headers: {
+          'Content-Type': 'application/json',  
+        }, 
+        body: JSON.stringify({
+          stylePrompt:stylePrompt,
+        }),
+      });
+      const similarImgs = await styleResponse.json();
+      setSimilarImagePaths(similarImgs.imagePaths);
+      setSimilarWeights(similarImgs.weights);
     } catch (error) {
       console.error('Error:', error);
     }
