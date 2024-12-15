@@ -1,71 +1,76 @@
-import React, { useState } from 'react';
+import React, { useState , useEffect } from 'react';
 
 const StyleTransferUI = () => {
   const [contentImage, setContentImage] = useState(null);
   const [stylePrompt, setStylePrompt] = useState('');
-  const [result, setResult] = useState(null);
+  const [targetImage, setTargetImage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [colabUrl, setColabUrl] = useState('');
-
-  useEffect(() => {
-    const fetchColabUrl = async() => {
-      try {
-        const response = await fetch('/get-colab-url');
-        const data = await response.json();
-        setColabUrl(data.colab_url);
-      }
-      catch (error) {
-        console.error("Error fetching colab public url", error);
-      }
-    };
-    fetchColabUrl();
-  }, []);
+  const [targetLoading, setTargetLoading] = useState(false);
+  const colabUrl='https://b3eb-34-143-189-192.ngrok-free.app';
 
   const handleImageUpload = (event) => {
+    //console.log("image upload event triggered")
     const file = event.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setContentImage(reader.result);
-      };
-      reader.readAsDataURL(file);
+      setContentImage(file)
     }
   };
 
   const handleSubmit = async () => {
+    console.log('Generate button clicked');
+    if(!contentImage) {
+      console.log("Please upload an image");
+      return;
+    }
+    if (!stylePrompt) {
+      console.log("Please input a style prompt");
+      return;
+    }
+    if (!colabUrl) {
+      console.log("Colab URL not found");
+      return;
+    }
+    
     setLoading(true);
-    try {
-      const response = await fetch('${colabUrl}/style-transfer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contentImage: contentImage,
-          stylePrompt: stylePrompt
-        })
-      });
-      
-      const data = await response.json();
-      setResult(data.result);
 
-      const styleResponse = await fetch('${colabUrl}/get-similar-styles', {
-        method: 'POST', 
-        headers: {
-          'Content-Type': 'application/json',  
-        }, 
-        body: JSON.stringify({
-          stylePrompt:stylePrompt,
-        }),
+    try {
+      const formData = new FormData();
+      formData.append('content_image', contentImage)
+      formData.append('stylePrompt', stylePrompt)
+      
+      console.log('Sending request to:', `${colabUrl}/nst`);
+      
+      const response = await fetch(`${colabUrl}/nst`, {
+        method: 'POST',
+        body: formData
       });
-      const similarImgs = await styleResponse.json();
-      setSimilarImagePaths(similarImgs.imagePaths);
-      setSimilarWeights(similarImgs.weights);
+
+      if (!response.ok){
+        throw new Error(`Error: ${response.status}`);
+      }
+      
+      setTargetLoading(true);
+      const data = await response.json();
+      console.log("Received data:", data);
+      if (data.image_url) {
+        setTargetImage(`${colabUrl}${data.image_url}`)
+      }
+      setTargetLoading(false);
+
+      //const similarImgs = await styleResponse.json();
+      //setSimilarImagePaths(similarImgs.imagePaths);
+      //setSimilarWeights(similarImgs.weights);
     } catch (error) {
       console.error('Error:', error);
     }
-    setLoading(false);
+    finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    console.log(`targetImage: ${targetImage}`);
+  }, [targetImage]);
 
   return (
     <div className="p-4 max-w-md mx-auto">
@@ -81,7 +86,7 @@ const StyleTransferUI = () => {
           />
           {contentImage && (
             <img 
-              src={contentImage} 
+              src={URL.createObjectURL(contentImage)} 
               alt="Content" 
               className="mt-2 max-w-full h-auto"
             />
@@ -106,15 +111,18 @@ const StyleTransferUI = () => {
           {loading ? 'Processing...' : 'Generate'}
         </button>
 
-        {result && (
+        {targetImage && !targetLoading && (
           <div>
-            <h2 className="font-bold mt-4">Result:</h2>
+            <h2 className="font-bold mt-4">Target Image:</h2>
             <img 
-              src={result} 
-              alt="Result" 
+              src={targetImage}
+              alt="Target" 
               className="mt-2 max-w-full h-auto"
             />
           </div>
+        )}
+        {targetImage && targetLoading &&(
+          <div className="mt-4">Loading result image...</div>
         )}
       </div>
     </div>
