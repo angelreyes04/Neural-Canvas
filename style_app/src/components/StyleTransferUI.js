@@ -12,7 +12,7 @@ const StyleTransferUI = () => {
   const [date, setDate] = useState([])
   const [medium, setMedium] = useState([])
   const [hasRefreshed, setHasRefreshed] = useState(false)
-  const colabUrl='https://ed01-34-105-107-121.ngrok-free.app';
+  const colabUrl='https://5bcd-34-169-34-1.ngrok-free.app';
 
   const handleImageUpload = (event) => {
     //console.log("image upload event triggered")
@@ -74,10 +74,10 @@ const StyleTransferUI = () => {
         setTitle(data.art_title)
       }
       if (data.artist) {
-        setArtist(data.setArtist)
+        setArtist(data.artist)
       }
       if (data.date) {
-        setDate(data.data)
+        setDate(data.date)
       }
       if (data.medium) {
         setMedium(data.medium)
@@ -103,90 +103,114 @@ const StyleTransferUI = () => {
     setHasRefreshed(true); 
   }
 
+  useEffect(() => {
+    console.log("Artist:", artist);
+  }, [artist]);
+
+  useEffect(() => {
+    console.log("Date:", date);
+  }, [date]);
+
+  useEffect(() => {
+    console.log("Style Prompt:", stylePrompt);
+  }, [stylePrompt]);
   
   return (
-    <div className="p-4 max-w-md mx-auto">
+    <div className="p-4 max-w-2x1 mx-auto">
       <h1 className="text-2xl font-bold mb-4 text-center bg-gradient-to-r text-transparent bg-clip-text from-red-500 via-yellow-500 to-blue-500">
         Neural Style Transfer
       </h1>
-      <div className="space-y-4">
-        <div>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="w-full p-2 border rounded"
-          />
-          {contentImage && (
-            <img 
-              src={URL.createObjectURL(contentImage)} 
-              alt="Content" 
-              className="mt-2 max-w-full h-auto"
-            />
-          )}
-        </div>
 
-        <div>
-          <input
+      <div className="mb-4">
+        Input a style description and content image below!
+      </div>
+
+      <div className="mb-4">
+        <input
             type="text"
             value={stylePrompt}
             onChange={(e) => setStylePrompt(e.target.value)}
             placeholder="Enter style description (Like 'happy, rainbow')"
             className="w-full p-2 border rounded"
           />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="w-full p-2 border rounded mb-2"
+          />
+          {contentImage && (
+            <img 
+              src={URL.createObjectURL(contentImage)} 
+              alt="Content" 
+              className="w-full h-auto object-cover rounded"
+            />
+          )}
         </div>
 
+        <div>
+          {targetImage ? (
+            <img 
+              src={targetImage}
+              alt="Target" 
+              className="w-full h-auto object-cover rounded"
+            />
+          ): (
+            <div className="w-full h-full border-2 border-dashed flex items-center justify-center text-gray-400 rounded">
+              Target Image
+            </div>
+          )}  
+        </div>
+      </div>
+
+      <div className="flex justify-center space-x-4 mb-4">
         <button
           onClick={handleSubmit}
-          disabled={(!contentImage || !stylePrompt || loading) && (targetImage && !hasRefreshed)}
-          className="w-full bg-blue-500 text-white p-2 rounded disabled:opacity-50"
+          disabled={!contentImage || !stylePrompt || loading}
+          className="bg-blue-500 text-white p-2 rounded disabled:opacity-50"
         >
           {loading ? 'Processing...' : 'Generate'}
         </button>
         <button
           onClick={handleRefresh}
-          className="w-full bg-gray-500 text-white p-2 rounded mt-4"
+          className="bg-gray-500 text-white p-2 rounded"
         >
           Refresh
         </button>
+      </div>
 
-        {targetImage && (
-          <div>
-            <h2 className="font-bold mt-4">Target Image:</h2>
-            <img 
-              src={targetImage}
-              alt="Target" 
-              className="mt-2 max-w-full h-auto"
-            />
-          </div>
-        )}  
-
-        {styleImages.length > 0 && (
-          <div>
-            <h2 className="font-bold mt-4">Style Images and Weights:</h2>
-            {styleImages.map((img, index) => (
-              <div key={index} className ="mb-4">
+      <div>
+        <h2 className="font-bold mt-4">Style Images and Weights:</h2>
+      </div>
+      {styleImages.length > 0 && (
+        <div className="grid grid-cols-2 gap-4">
+          {styleImages.map((img, index) => (
+            <div key={index} className ="border rounded p-2">
+              <img
+                src={img}
+                alt={`Style '${stylePrompt[index]}' #${index+1}`}
+                className="w-full h-80 object-cover rounded mb-2"
+              />
+              <div className="text-sm">
                 <h3> Style {index+1} </h3>
                 {(title?.[index] || artist?.[index] || date?.[index]) ? (
                   <p>
                     Art Title: {title?.[index] || "Unknown Title"}
-                    {artist?.[index] ? `by ${artist[index]}` : ""}
+                    {artist?.[index] ? ` by ${artist[index]}` : ""}
                     {date?.[index] ? `, ${date[index]}`: ""}
                   </p>
                 ): null}
                 <p>Medium: {medium?.[index] || "Unknown Medium"}</p>
                 <p>Weight: {styleWeights[index]}</p>
-
-                <img
-                  src={img}
-                  alt={`Style ${index+1}`}
-                  className="mt-2 max-w-full h-auto"
-                  />
               </div>
+            </div>
           ))}
-          </div>
-        )}   
-      </div>
+        </div>
+      )}
     </div>
   );
 };
